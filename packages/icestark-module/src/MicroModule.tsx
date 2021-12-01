@@ -69,45 +69,33 @@ export default class MicroModule extends React.Component<any, State> {
     }
   }
 
+  // 不提供自定义 render 机制
   validateRender() {
-    const { render } = this.moduleInfo || {};
-
-    if (render && typeof render !== 'function') {
-      console.error('[icestark]: render should be funtion');
-    }
-    return render && typeof render === 'function';
+    return false;
   }
 
   async mountModule() {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { sandbox, moduleInfo, wrapperClassName, wrapperStyle, loadingComponent, handleError, ...rest } = this.props;
 
-    if (!this.moduleInfo) {
-      console.error(`Can't find ${this.props.moduleName} module in modules config`);
-      return;
-    }
-    /**
-     * if `render` was provided, render immediately
-    */
-    if (!this.validateRender()) {
-      this.setState({ loading: true });
+    // 不支持自定义 render 机制
+    this.setState({ loading: true });
 
-      try {
-        const { mount, component } = await loadModule(this.moduleInfo, sandbox);
-        const lifecycleMount = mount;
+    try {
+      const { mount, component } = await loadModule(this.moduleInfo, sandbox);
+      const lifecycleMount = mount;
 
-        !this.unmout && this.setState({ loading: false });
-        if (lifecycleMount && component) {
-          if (this.unmout) {
-            unmoutModule(this.moduleInfo, this.mountNode);
-          } else {
-            lifecycleMount(component, this.mountNode, rest);
-          }
+      !this.unmout && this.setState({ loading: false });
+      if (lifecycleMount && component) {
+        if (this.unmout) {
+          unmoutModule(this.moduleInfo, this.mountNode);
+        } else {
+          lifecycleMount(component, this.mountNode, rest);
         }
-      } catch (err) {
-        this.setState({ loading: false });
-        handleError(err);
       }
+    } catch (err) {
+      this.setState({ loading: false });
+      handleError(err);
     }
   }
 

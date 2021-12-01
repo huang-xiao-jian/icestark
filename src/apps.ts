@@ -164,56 +164,25 @@ export function updateAppConfig(appName: string, config) {
 
 // load app js assets
 export async function loadAppModule(appConfig: AppConfig) {
-  const { onLoadingApp, onFinishLoading, fetch } = getAppConfig(appConfig.name)?.configuration || globalConfiguration;
-
   let lifecycle: ModuleLifeCycle = {};
-  onLoadingApp(appConfig);
-  const appSandbox = createSandbox(appConfig.sandbox) as Sandbox;
-  const { url, container, entry, entryContent, name, scriptAttributes = [], umd } = appConfig;
-  const appAssets = url ? getUrlAssets(url) : await getEntryAssets({
-    root: container,
-    entry,
-    href: location.href,
-    entryContent,
-    assetsCacheKey: name,
-    fetch,
-  });
-  updateAppConfig(appConfig.name, { appAssets, appSandbox });
+
+  // 也许你不需要沙箱
+  const { url, name } = appConfig;
+  const appAssets = getUrlAssets(url);
+
+  // 作用不明
+  updateAppConfig(appConfig.name, { appAssets });
 
   /**
-   * LoadScriptMode has the first priority
+   * 只保留 import 模式
    */
-  const loadScriptMode = appConfig.loadScriptMode ?? (umd ? 'fetch' : 'script');
+  await loadAndAppendCssAssets([
+    ...appAssets.cssList,
+    ...filterRemovedAssets(importCachedAssets[name] || [], ['LINK', 'STYLE']),
+  ]);
 
-  switch (loadScriptMode) {
-    case 'import':
-      await loadAndAppendCssAssets([
-        ...appAssets.cssList,
-        ...filterRemovedAssets(importCachedAssets[name] || [], ['LINK', 'STYLE']),
-      ]);
-      lifecycle = await loadScriptByImport(appAssets.jsList);
-      // Not to handle script element temporarily.
-      break;
-    case 'fetch':
-      await loadAndAppendCssAssets(appAssets.cssList);
-      lifecycle = await loadScriptByFetch(appAssets.jsList, appSandbox);
-      break;
-    default:
-      await Promise.all([
-        loadAndAppendCssAssets(appAssets.cssList),
-        loadAndAppendJsAssets(appAssets, { sandbox: appSandbox, fetch, scriptAttributes }),
-      ]);
-      lifecycle =
-        getLifecyleByLibrary() ||
-        getLifecyleByRegister() ||
-        {};
-  }
+  lifecycle = await loadScriptByImport(appAssets.jsList);
 
-  if (isEmpty(lifecycle)) {
-    console.error('[@ice/stark] microapp should export mount/unmout or register registerAppEnter/registerAppLeave.');
-  }
-
-  onFinishLoading(appConfig);
 
   return combineLifecyle(lifecycle, appConfig);
 }
